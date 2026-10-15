@@ -1,0 +1,183 @@
+{
+  "name": "Reddit Thread Review Starter",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "manual-trigger",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        260,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "url": "=https://www.reddit.com/r/{{$env.REDDIT_SUBREDDIT || 'news'}}/new.json?limit={{$env.REDDIT_LIMIT || 10}}",
+        "responseFormat": "json",
+        "options": {}
+      },
+      "id": "fetch-reddit-posts",
+      "name": "Fetch Reddit Posts",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        500,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const children = $json?.data?.children ?? [];\n\nreturn children.map(({ data }) => ({\n  json: {\n    id: data.id,\n    title: data.title,\n    author: data.author,\n    subreddit: data.subreddit,\n    score: data.score,\n    comments: data.num_comments,\n    createdUtc: data.created_utc,\n    permalink: `https://www.reddit.com${data.permalink}`,\n    body: data.selftext || ''\n  }\n}));"
+      },
+      "id": "normalize-posts",
+      "name": "Normalize Posts",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        740,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{$json.score}}",
+              "operation": "largerEqual",
+              "value2": 25
+            },
+            {
+              "value1": "={{$json.comments}}",
+              "operation": "largerEqual",
+              "value2": 5
+            }
+          ]
+        }
+      },
+      "id": "filter-high-signal",
+      "name": "Filter High Signal Threads",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        980,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "review-prompt",
+              "name": "reviewPrompt",
+              "type": "string",
+              "value": "=Review this Reddit thread for trends, risks, and action items:\\n\\nTitle: {{$json.title}}\\nAuthor: {{$json.author}}\\nSubreddit: r/{{$json.subreddit}}\\nScore: {{$json.score}}\\nComments: {{$json.comments}}\\nURL: {{$json.permalink}}\\n\\nBody:\\n{{$json.body}}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "build-review-input",
+      "name": "Build Review Input",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1220,
+        220
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "next-step",
+              "name": "nextStep",
+              "type": "string",
+              "value": "Connect your LLM, Slack, email, or database node to the true output path to complete the automated review pipeline."
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "starter-placeholder",
+      "name": "Starter Placeholder",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1460,
+        220
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Manual Trigger": {
+      "main": [
+        [
+          {
+            "node": "Fetch Reddit Posts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Reddit Posts": {
+      "main": [
+        [
+          {
+            "node": "Normalize Posts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Posts": {
+      "main": [
+        [
+          {
+            "node": "Filter High Signal Threads",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter High Signal Threads": {
+      "main": [
+        [
+          {
+            "node": "Build Review Input",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Build Review Input": {
+      "main": [
+        [
+          {
+            "node": "Starter Placeholder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {},
+  "versionId": "1",
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "id": "reddit-thread-review-starter",
+  "tags": []
+}
